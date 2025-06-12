@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Drive</title>
+  <style>
+    canvas {
+      border: 2px solid black;
+      background-color: #d0f0d0;
+      display: block;
+      margin: 0 auto;
+    }
+    body {
+      text-align: center;
+      font-family: sans-serif;
+    }
+    #leaderboard {
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🏁 Drive</h1>
+  <p>Gebruik de pijltjestoetsen om de auto te besturen en ontwijk de obstakels!</p>
+  <canvas id="gameCanvas" width="400" height="600"></canvas>
+  <div id="leaderboard">
+    <h2>🏆 Leaderboard</h2>
+    <ol id="scores"></ol>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const scoresList = document.getElementById("scores");
+
+    const car = {
+      x: 180,
+      y: 500,
+      width: 40,
+      height: 60,
+      color: "blue",
+      speed: 5
+    };
+
+    const carImage = new Image();
+    carImage.src = "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Car_top_view.svg/64px-Car_top_view.svg.png";
+
+    const keys = {};
+    const obstacles = [];
+    let score = 0;
+    let obstacleSpeed = 3;
+    let interval = 1000;
+    let spawnInterval;
+
+    let leaderboard = JSON.parse(localStorage.getItem("driveLeaderboard")) || [];
+
+    function updateLeaderboard() {
+      scoresList.innerHTML = "";
+      leaderboard.sort((a, b) => b - a).slice(0, 5).forEach(s => {
+        const li = document.createElement("li");
+        li.textContent = s + " punten";
+        scoresList.appendChild(li);
+      });
+    }
+
+    document.addEventListener("keydown", (e) => keys[e.key] = true);
+    document.addEventListener("keyup", (e) => keys[e.key] = false);
+
+    function spawnObstacle() {
+      const x = Math.random() * (canvas.width - 40);
+      obstacles.push({ x, y: -60, width: 40, height: 60, speed: obstacleSpeed });
+    }
+
+    function update() {
+      if (keys["ArrowLeft"] && car.x > 0) car.x -= car.speed;
+      if (keys["ArrowRight"] && car.x + car.width < canvas.width) car.x += car.speed;
+
+      obstacles.forEach(obs => obs.y += obs.speed);
+
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        if (obstacles[i].y > canvas.height) {
+          obstacles.splice(i, 1);
+          score++;
+          if (score % 5 === 0) {
+            obstacleSpeed += 0.5;
+            clearInterval(spawnInterval);
+            interval = Math.max(300, interval - 100);
+            spawnInterval = setInterval(spawnObstacle, interval);
+          }
+        }
+      }
+
+      obstacles.forEach(obs => {
+        if (car.x < obs.x + obs.width && car.x + car.width > obs.x &&
+            car.y < obs.y + obs.height && car.y + car.height > obs.y) {
+          alert("Game over! Je score: " + score);
+          leaderboard.push(score);
+          localStorage.setItem("driveLeaderboard", JSON.stringify(leaderboard));
+          updateLeaderboard();
+          score = 0;
+          obstacleSpeed = 3;
+          obstacles.length = 0;
+          interval = 1000;
+          clearInterval(spawnInterval);
+          spawnInterval = setInterval(spawnObstacle, interval);
+        }
+      });
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (carImage.complete && carImage.naturalHeight !== 0) {
+        ctx.drawImage(carImage, car.x, car.y, car.width, car.height);
+      } else {
+        ctx.fillStyle = car.color;
+        ctx.fillRect(car.x, car.y, car.width, car.height);
+      }
+
+      ctx.fillStyle = "red";
+      obstacles.forEach(obs => {
+        ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+      });
+
+      ctx.fillStyle = "black";
+      ctx.font = "20px Arial";
+      ctx.fillText("Score: " + score, 10, 30);
+    }
+
+    function gameLoop() {
+      update();
+      draw();
+      requestAnimationFrame(gameLoop);
+    }
+
+    carImage.onload = () => {
+      spawnInterval = setInterval(spawnObstacle, interval);
+      updateLeaderboard();
+      gameLoop();
+    };
+  </script>
+</body>
+</html>
